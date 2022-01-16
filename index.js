@@ -39,7 +39,7 @@ client.connect((err) => {
     res.send(result);
   });
 
-  // delete api
+  // delete API
   app.delete("/allServices/:id", async (req, res) => {
     const id = req.params.id;
     const query = { _id: ObjectId(id) };
