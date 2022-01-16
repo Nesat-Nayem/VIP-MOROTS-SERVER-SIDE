@@ -1,11 +1,13 @@
-const express = require('express');
-const { MongoClient } = require('mongodb');
-const ObjectId = require('mongodb').ObjectId;
-require('dotenv').config()
-const cors = require('cors');
-
+const express = require("express");
 const app = express();
-const port = process.env.PORT ||  5000;
+const cors = require("cors");
+
+require("dotenv").config();
+const { MongoClient } = require("mongodb");
+const ObjectId = require("mongodb").ObjectId;
+const stripe = require("stripe")(process.env.STRIPE_SECREATE);
+
+const port = process.env.PORT || 5000;
 
 // middleware
 app.use(cors());
@@ -13,9 +15,10 @@ app.use(express.json());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.hty68.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 
-const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
-
-
+const client = new MongoClient(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 client.connect((err) => {
   const servicesCollection = client.db("DreemSky").collection("services");
@@ -37,12 +40,12 @@ client.connect((err) => {
   });
 
   // delete api
-  app.delete('/allServices/:id', async(req,res) =>{
+  app.delete("/allServices/:id", async (req, res) => {
     const id = req.params.id;
-    const query = {_id:ObjectId(id)};
+    const query = { _id: ObjectId(id) };
     const result = await servicesCollection.deleteOne(query);
-    res.json(result)
-})
+    res.json(result);
+  });
 
   // single service
   app.get("/singleService/:id", async (req, res) => {
@@ -53,6 +56,7 @@ client.connect((err) => {
     res.send(result[0]);
     console.log(result);
   });
+
   // get services use id
   app.get("/allServices/:id", async (req, res) => {
     console.log(req.params.id);
@@ -70,6 +74,19 @@ client.connect((err) => {
     res.send(result);
   });
 
+  app.put("/orders/:id", async (req, res) => {
+    const id = req.params.id;
+    const payment = req.body;
+    const filter = { _id: ObjectId(id) };
+    const updateDoc = {
+      $set: {
+        payment: payment,
+      },
+    };
+    const result = await ordersCollection.updateOne(filter, updateDoc);
+    res.json(result);
+  });
+
   app.get("/myOrder/:email", async (req, res) => {
     console.log(req.params.email);
     const result = await ordersCollection
@@ -79,9 +96,9 @@ client.connect((err) => {
   });
 
   // delete my order api
-  app.delete('/myOrder/:id', async(req,res)=>{
+  app.delete("/myOrder/:id", async (req, res) => {
     const id = req.params.id;
-    const query = {_id:ObjectId(id)};
+    const query = { _id: ObjectId(id) };
     const result = await ordersCollection.deleteOne(query);
     res.json(result);
   });
@@ -94,11 +111,11 @@ client.connect((err) => {
 
   // get review
 
-  app.get("/myReview", async (req,res) =>{
-    console.log("hello review")
+  app.get("/myReview", async (req, res) => {
+    console.log("hello review");
     const result = await reviewCollection.find({}).toArray();
-    res.send(result)
-  })
+    res.send(result);
+  });
 
   app.post("/addUserInfo", async (req, res) => {
     console.log("req.body");
@@ -120,7 +137,7 @@ client.connect((err) => {
     }
   });
 
-  // check admin 
+  // check admin
   app.get("/checkAdmin/:email", async (req, res) => {
     const result = await usersCollection
       .find({ email: req.params.email })
@@ -130,23 +147,25 @@ client.connect((err) => {
   });
 
   /// all order
-  app.get("/allOrders", async (req, res) => {   
+  app.get("/allOrders", async (req, res) => {
     const result = await ordersCollection.find({}).toArray();
     res.send(result);
   });
-  
-// single order
+
+  // single order
   app.get("/allOrders/:id", async (req, res) => {
-    const result = await ordersCollection.find({_id: ObjectId(req.params.id)}).toArray();
+    const result = await ordersCollection
+      .find({ _id: ObjectId(req.params.id) })
+      .toArray();
     res.send(result);
   });
 
-  app.delete('/allOrders/id', async(req,res) =>{
-    const id =req.params.id;
-    const query = {_id:ObjectId(id)};
+  app.delete("/allOrders/id", async (req, res) => {
+    const id = req.params.id;
+    const query = { _id: ObjectId(id) };
     const result = await ordersCollection.deleteOne(query);
-    res.json(result)
-  })
+    res.json(result);
+  });
 
   // status update
   app.put("/statusUpdate/:id", async (req, res) => {
@@ -160,13 +179,23 @@ client.connect((err) => {
     res.send(result);
     console.log(result);
   });
-});
 
+  app.post("/create-payment-intent", async (req, res) => {
+    const paymentInfo = req.body;
+    const amount = paymentInfo.price * 100;
+    const paymentIntent = await stripe.paymentIntents.create({
+      currency: "usd",
+      amount: amount,
+      payment_method_types: ["card"],
+    });
+    res.json({ clientSecret: paymentIntent.client_secret });
+  });
+});
 
 app.get("/", (req, res) => {
   res.send("vip motors server is live");
 });
 
 app.listen(port, () => {
-  console.log(`listening at ${port}`)
-})
+  console.log(`listening at ${port}`);
+});
